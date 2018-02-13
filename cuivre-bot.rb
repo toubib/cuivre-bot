@@ -15,61 +15,64 @@ rows = db.execute <<-SQL
   );
 SQL
 
-bot = Discordrb::Bot.new token: config['token'], client_id: config['client_id']
+bot = Discordrb::Commands::CommandBot.new token: config['token'], client_id: config['client_id'], prefix: config['prefix']
 
 #Add a ressource
-ressource_update_regex=/^([a-z]*) *([=+-]) *([0-9]*)$/
-bot.message(contains: ressource_update_regex) do |event|
-  if r = event.text.match(ressource_update_regex)
-    ressource = r[1]
-    operator = r[2]
-    value = r[3]
+bot.command(:set, description: "Set a ressource.", usage: "set <ressource> +-= valeur", min_args: 1, max_args: 3) do |event|
 
-    #Select previous value in db
-    previous_value = nil
-    db.execute( "select value from ressources where username=? and ressourcename=?", event.user.name, ressource ) do |row|
-      previous_value = row[0]
-    end
+  r = event.text.match /^#{config['prefix']}set ([a-z]*) *([=+-]) *([0-9]*)$/
 
-    if previous_value.nil? #first call
-      case operator
-      when '=', '+'
-        current_value = value.to_i
-      when '-'
-        current_value = 0
-      end
-      #p ("insert #{current_value}")
-      db.execute("insert into ressources(username,ressourcename,value) values ( ?, ?, ? )", event.user.name, ressource, current_value)
-
-    elsif operator == '=' and value.to_i == 0 #delete entry
-      db.execute("delete from ressources where username=? and ressourcename=?", event.user.name, ressource)
-
-    else #update
-      case operator
-      when '='
-        current_value = value.to_i
-      when '+'
-        current_value = previous_value.to_i + value.to_i
-      when '-'
-        current_value = previous_value.to_i - value.to_i
-        current_value = 0 if current_value < 0
-      end
-      #p ("update to #{current_value}")
-      db.execute("update ressources set value=? where username=? and ressourcename=?", current_value, event.user.name, ressource)
-    end
-
-    #p "#{ressource} is now #{current_value} (+#{value})"
-
-    event.respond "#{ressource} is now #{current_value} (+#{value}) for #{event.user.name}"
-  else
+  if r.nil?
     event.respond "Try Again"
+    return
   end
+
+  ressource = r[1]
+  operator = r[2]
+  value = r[3]
+
+  #Select previous value in db
+  previous_value = nil
+  db.execute( "select value from ressources where username=? and ressourcename=?", event.user.name, ressource ) do |row|
+    previous_value = row[0]
+  end
+
+  if previous_value.nil? #first call
+    case operator
+    when '=', '+'
+      current_value = value.to_i
+    when '-'
+      current_value = 0
+    end
+    #p ("insert #{current_value}")
+    db.execute("insert into ressources(username,ressourcename,value) values ( ?, ?, ? )", event.user.name, ressource, current_value)
+
+  elsif operator == '=' and value.to_i == 0 #delete entry
+    db.execute("delete from ressources where username=? and ressourcename=?", event.user.name, ressource)
+
+  else #update
+    case operator
+    when '='
+      current_value = value.to_i
+    when '+'
+      current_value = previous_value.to_i + value.to_i
+    when '-'
+      current_value = previous_value.to_i - value.to_i
+      current_value = 0 if current_value < 0
+    end
+    #p ("update to #{current_value}")
+    db.execute("update ressources set value=? where username=? and ressourcename=?", current_value, event.user.name, ressource)
+  end
+
+  #p "#{ressource} is now #{current_value} (+#{value})"
+
+  event.respond "#{ressource} is now #{current_value} (+#{value}) for #{event.user.name}"
 end
 
 #Get a ressource sum value
-get_ressource_regex=/^get  *([a-z]*)$/
-bot.message(contains: get_ressource_regex) do |event|
-  r = event.text.match(get_ressource_regex)
+bot.command(:get, description: "Get a ressource.", usage: "get <ressource>", min_args: 1, max_args: 1) do |event|
+
+  r = event.text.match /^#{config['prefix']}get *([a-z]*)$/
   if r.nil?
     event.respond "Try Again"
     return
@@ -86,7 +89,7 @@ bot.message(contains: get_ressource_regex) do |event|
   event.respond ret
 end
 
-bot.message(content: 'get ressources') do |event|
+bot.command(:ressources, description: "Get total ressources.") do |event|
   ressources = []
   ret = ""
 
@@ -98,7 +101,7 @@ bot.message(content: 'get ressources') do |event|
   #Get values for each
   ressources.each do |r|
     db.execute( "select sum(value) from ressources where ressourcename = ?", r ) do |row|
-      ret = ret + "#{r}: #{row[0]}\n"
+      ret = ret + "*#{r}*: #{row[0]}\n"
     end
   end
 
@@ -106,37 +109,12 @@ bot.message(content: 'get ressources') do |event|
 end
 
 #List all ressources for all users
-bot.message(content: 'get all') do |event|
+bot.command(:details, description: "Get all ressources for each users.") do |event|
   ret = ""
   db.execute( "select ressourcename,username,value from ressources order by ressourcename" ) do |row|
-    ret = ret + "#{row[0]} #{row[1]}: #{row[2]}\n"
+    ret = ret + "*#{row[0]}* #{row[1]}: #{row[2]}\n"
   end
   event.respond ret
-end
-
-#Print help
-bot.message(content: 'help') do |event|
-  help =  "Ajouter une ressource:\n"
-  help += "  <ressource> = valeur\n"
-  help += "  <ressource> + valeur\n"
-  help += "  <ressource> - valeur\n"
-  help += "\n"
-  help += "Supprimer une ressource:\n"
-  help += "  <ressource> = 0\n"
-  help += "\n"
-  help += "Lister une ressource:\n"
-  help += "  get <ressource>\n"
-  help += "\n"
-  help += "Lister toutes les ressources disponibles:\n"
-  help += "  get ressources\n"
-  help += "\n"
-  help += "Lister le detail de chacun:\n"
-  help += "  get all\n"
-  help += "\n"
-  help += "Liste des ressources autorisées:\n"
-  help += "\n"
-
-  event.respond help
 end
 
 bot.run
