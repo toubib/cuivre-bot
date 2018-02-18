@@ -31,6 +31,12 @@ bot.command(:set, description: "Set a ressource.", usage: "set <ressource> +-= v
   operator = r[2]
   value = r[3]
 
+  #Check if ressource is allowed
+  if !config['ressources'].include? ressource
+    event.respond "Ressource #{ressource} not allowed"
+    return
+  end
+
   #Select previous value in db
   previous_value = nil
   db.execute( "select value from ressources where username=? and ressourcename=?", event.user.name, ressource ) do |row|
@@ -115,6 +121,12 @@ bot.command(:details, description: "Get all ressources for each users.") do |eve
     ret = ret + "*#{row[0]}* #{row[1]}: #{row[2]}\n"
   end
   event.respond ret
+end
+
+#List allowed ressources
+bot.command(:list, description: "list allowed ressources.") do |event|
+  ret = ""
+  event.respond config['ressources'].sort.join("\n")
 end
 
 bot.run
