@@ -1,6 +1,7 @@
 token: SECRET_TOKEN
 client_id: CLIENT_ID
 prefix: "."
+admin_password: CHANGEME
 ressources:
  - cuivre
  - fer

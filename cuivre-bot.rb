@@ -17,6 +17,44 @@ SQL
 
 bot = Discordrb::Commands::CommandBot.new token: config['token'], client_id: config['client_id'], prefix: config['prefix']
 
+def update_ressource(db, username, ressource, operator, value)
+
+  #Select previous value in db
+  previous_value = nil
+  db.execute( "select value from ressources where username=? and ressourcename=?", username, ressource ) do |row|
+    previous_value = row[0]
+  end
+
+  if previous_value.nil? #first call
+    case operator
+    when '=', '+'
+      current_value = value.to_i
+    when '-'
+      current_value = 0
+    end
+    #p ("insert #{current_value}")
+    db.execute("insert into ressources(username,ressourcename,value) values ( ?, ?, ? )", username, ressource, current_value)
+
+  elsif operator == '=' and value.to_i == 0 #delete entry
+    db.execute("delete from ressources where username=? and ressourcename=?", username, ressource)
+
+  else #update
+    case operator
+    when '='
+      current_value = value.to_i
+    when '+'
+      current_value = previous_value.to_i + value.to_i
+    when '-'
+      current_value = previous_value.to_i - value.to_i
+      current_value = 0 if current_value < 0
+    end
+    #p ("update to #{current_value}")
+    db.execute("update ressources set value=? where username=? and ressourcename=?", current_value, username, ressource)
+  end
+
+  return current_value
+end
+
 #Add a ressource
 bot.command(:set, description: "Set a ressource.", usage: "set <ressource> +-= valeur", min_args: 1, max_args: 3) do |event|
 
@@ -37,38 +75,8 @@ bot.command(:set, description: "Set a ressource.", usage: "set <ressource> +-= v
     return
   end
 
-  #Select previous value in db
-  previous_value = nil
-  db.execute( "select value from ressources where username=? and ressourcename=?", event.user.name, ressource ) do |row|
-    previous_value = row[0]
-  end
+  current_value = update_ressource(db, event.user.name, ressource, operator, value)
 
-  if previous_value.nil? #first call
-    case operator
-    when '=', '+'
-      current_value = value.to_i
-    when '-'
-      current_value = 0
-    end
-    #p ("insert #{current_value}")
-    db.execute("insert into ressources(username,ressourcename,value) values ( ?, ?, ? )", event.user.name, ressource, current_value)
-
-  elsif operator == '=' and value.to_i == 0 #delete entry
-    db.execute("delete from ressources where username=? and ressourcename=?", event.user.name, ressource)
-
-  else #update
-    case operator
-    when '='
-      current_value = value.to_i
-    when '+'
-      current_value = previous_value.to_i + value.to_i
-    when '-'
-      current_value = previous_value.to_i - value.to_i
-      current_value = 0 if current_value < 0
-    end
-    #p ("update to #{current_value}")
-    db.execute("update ressources set value=? where username=? and ressourcename=?", current_value, event.user.name, ressource)
-  end
 
   #p "#{ressource} is now #{current_value} (+#{value})"
 
@@ -127,6 +135,44 @@ end
 bot.command(:list, description: "list allowed ressources.") do |event|
   ret = ""
   event.respond config['ressources'].sort.join("\n")
+end
+
+#Force set for a user
+bot.command(:adminset, description: "Set a ressource.", usage: "adminset <user> <ressource> +-= valeur", min_args: 1, max_args: 3) do |event|
+  r = event.text.match /^#{config['prefix']}adminset ([a-zA-Z0-9]*) ([a-zA-Z0-9 ()-]*) ([a-z]*) *([=+-]) *([0-9]*)$/
+
+  if r.nil?
+    event.respond "Try Again"
+    return
+  end
+
+  password = r[1]
+  username = r[2]
+  ressource = r[3]
+  operator = r[4]
+  value = r[5]
+
+  #Check password
+  if config['admin_password'] != password
+    event.respond "Bye"
+    return
+  end
+
+  #Check if channel is private
+  if !event.channel.private?
+    event.respond "This must be private bro !"
+    return
+  end
+
+  #Check if ressource is allowed
+  if !config['ressources'].include? ressource
+    event.respond "Ressource #{ressource} not allowed"
+    return
+  end
+
+  current_value = update_ressource(db, username, ressource, operator, value)
+
+  event.respond "#{ressource} is now #{current_value} (+#{value}) for #{username}"
 end
 
 bot.run
