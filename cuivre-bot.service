@@ -1,0 +1,9 @@
+[Unit]
+Description=Cuivre discord bot
+
+[Service]
+User=discord
+Group=discord
+WorkingDirectory=/home/discord/cuivre-bot
+Restart=always
+ExecStart=/usr/bin/ruby cuivre-bot.rb
