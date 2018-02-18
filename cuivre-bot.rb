@@ -58,7 +58,7 @@ end
 #Add a ressource
 bot.command(:set, description: "Set a ressource.", usage: "set <ressource> +-= valeur", min_args: 1, max_args: 3) do |event|
 
-  r = event.text.match /^#{config['prefix']}set ([a-z]*) *([=+-]) *([0-9]*)$/
+  r = event.text.match /^#{config['prefix']}set ([a-z-]*) *([=+-]) *([0-9]*)$/
 
   if r.nil?
     event.respond "Try Again"
@@ -86,7 +86,7 @@ end
 #Get a ressource sum value
 bot.command(:get, description: "Get a ressource.", usage: "get <ressource>", min_args: 1, max_args: 1) do |event|
 
-  r = event.text.match /^#{config['prefix']}get *([a-z]*)$/
+  r = event.text.match /^#{config['prefix']}get *([a-z-]*)$/
   if r.nil?
     event.respond "Try Again"
     return
@@ -138,8 +138,8 @@ bot.command(:list, description: "list allowed ressources.") do |event|
 end
 
 #Force set for a user
-bot.command(:adminset, description: "Set a ressource.", usage: "adminset <user> <ressource> +-= valeur", min_args: 1, max_args: 3) do |event|
-  r = event.text.match /^#{config['prefix']}adminset ([a-zA-Z0-9]*) ([a-zA-Z0-9 ()-]*) ([a-z]*) *([=+-]) *([0-9]*)$/
+bot.command(:adminset, description: "Set a ressource.", usage: "adminset <password> <user> <ressource> +-= valeur", min_args: 1, max_args: 3) do |event|
+  r = event.text.match /^#{config['prefix']}adminset ([a-zA-Z0-9]*) ([a-zA-Z0-9 ()-]*) ([a-z-]*) *([=+-]) *([0-9]*)$/
 
   if r.nil?
     event.respond "Try Again"
